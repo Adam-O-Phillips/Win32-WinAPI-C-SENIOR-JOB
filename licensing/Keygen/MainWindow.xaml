@@ -1,0 +1,15 @@
+﻿<Window x:Class="Keygen.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Keygen"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="352.27" Width="507.846">
+    <Grid>
+        <Button x:Name="BTN_Generate" Content="Generate!" HorizontalAlignment="Left" Margin="392,18,0,0" VerticalAlignment="Top" Width="75" Click="Button_Click" Cursor="Hand"/>
+        <TextBox x:Name="dev_info_text" HorizontalAlignment="Left" Height="20" Margin="32,18,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="355" Background="#FF27393C" Foreground="White"/>
+        <TextBox x:Name="txt_active_code" HorizontalAlignment="Left" Height="248" Margin="32,55,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="435"/>
+
+    </Grid>
+</Window>

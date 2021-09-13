@@ -1,0 +1,15 @@
+﻿<Window x:Class="Validator.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Validator"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="523.569" Width="800">
+    <Grid>
+        <TextBox x:Name="txtActivCode" HorizontalAlignment="Left" Height="317" Margin="30,70,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="725" MaxLength="2147483647" AcceptsReturn="True"/>
+        <TextBox x:Name="txtDevId" HorizontalAlignment="Left" Height="23" Margin="30,28,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="527"/>
+        <Button x:Name="btnRegister" Content="register" HorizontalAlignment="Left" Margin="562,28,0,0" VerticalAlignment="Top" Width="93" Height="23" Click="Button_Click"/>
+        <TextBlock x:Name="txtResult" HorizontalAlignment="Left" Margin="30,405,0,0" TextWrapping="Wrap" VerticalAlignment="Top" RenderTransformOrigin="-5.43,2.135" Height="63" Width="542" IsEnabled="False"/>
+    </Grid>
+</Window>
