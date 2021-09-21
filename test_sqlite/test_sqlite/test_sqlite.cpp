@@ -69,6 +69,13 @@ int main()
 
 	sqlite3_close(db);
 
+	rc = sqlite3_open("familyGuy.db", &db);
+	rc = sqlite3_key(db, "12345678", 8);
+
+	rc = sqlite3_exec(db, "select * from myTable", callback, 0, 0);
+
+	sqlite3_close(db);
+
 	return 0;
 }
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
