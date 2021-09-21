@@ -2,6 +2,7 @@
 //
 #include <iostream> 
 #include "sqlite/sqlite3.h"
+#pragma comment(lib, "sqlite/sqlite3.lib")
 
 using namespace std;
 static int callback(void* NotUsed, int argc, char** argv, char** azColName)
@@ -34,6 +35,8 @@ int main()
 		cout << "Open database successfully\n\n";
 	}
 
+	rc = sqlite3_key(db, "12345678", 8);
+
 	pSQL[0] = "drop table myTable";
 
 	pSQL[1] = "create table myTable (FirstName varchar(30), LastName varchar(30), Age smallint, Hometown varchar(30), Job varchar(30))";
@@ -56,7 +59,7 @@ int main()
 	for (int i = 0; i < STATEMENTS; i++)
 	{
 		rc = sqlite3_exec(db, pSQL[i], callback, 0, &zErrMsg);
-		if (rc != SQLITE_OK)
+		if (rc != SQLITE_OK && i != 0)
 		{
 			cout << "SQL error: " << sqlite3_errmsg(db) << "\n";
 			sqlite3_free(zErrMsg);
