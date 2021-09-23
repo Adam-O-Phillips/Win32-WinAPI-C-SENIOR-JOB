@@ -143,10 +143,14 @@ DWORD WINAPI InnerMateCommThreadProc(LPVOID lp)
 				Log(_T("slave conflict\n"));
 			}
 		}
-		else
+		else if (nRecvLen > 0)
 		{
 			::SendMessage(hMsgWnd, WM_MATE_RECEIVE_MSG, (WPARAM)nRecvLen, (LPARAM)aucData);
 			Log(_T("received message(%d) from mate\n"), nRecvLen);
+		}
+		else
+		{
+			Log(_T("socket error %d\n"), WSAGetLastError());
 		}
 
 		if (qwTickNow >= qwTickKeepAliveTx + MATE_COMM_MAX_DELAY)
