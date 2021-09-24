@@ -83,6 +83,8 @@ char* crypto_keygen(const void* dev_info, int len, uint32_t dwSeq, uint64_t qwIs
 	if (enclen < 0)
 		goto _err_exit_;
 
+	SAFE_FREE(base_data);
+	SAFE_FREE(encbuf);
 	activate_code[enclen] = 0;
 	return activate_code;
 
