@@ -11,9 +11,21 @@
 #include "..\\crypto_lib\\crypto.h"
 
 #if defined _DEBUG
+
+#if defined WIN32
 #pragma comment(lib, "..\\Debug\\crypto_lib")
 #else
+#pragma comment(lib, "..\\x64\\Debug\\crypto_lib")
+#endif
+
+#else
+
+#if defined WIN32
 #pragma comment(lib, "..\\Release\\crypto_lib")
+#else
+#pragma comment(lib, "..\\x64\\Release\\crypto_lib")
+#endif
+
 #endif
 
 #pragma comment(lib, "Crypt32")
@@ -160,12 +172,17 @@ void test_keygen()
 	if (!rsa2048_import_key_from_file("pubkey.bin", &pub_key, "privkey.bin", &priv_key, 0))
 		goto _exit;
 
-	activation_code = crypto_keygen(test_buf, strlen(test_buf), &priv_key);
+	activation_code = crypto_keygen(test_buf, strlen(test_buf), 322, 123, 300, 3, &priv_key);
 	if (activation_code)
 		printf("[KEYGEN] activation code = %s\n", activation_code);
 	
+	uint32_t dwSeq;
+	uint64_t qwIssuedAt;
+	uint32_t dwPeriod;
+	uint32_t dwFlag;
 
-	if (activation_checkout(activation_code, test_buf, strlen(test_buf), &pub_key))
+	if (activation_checkout(activation_code, test_buf, strlen(test_buf), &dwSeq, &qwIssuedAt, &dwPeriod, &dwFlag, &pub_key) && 
+		dwSeq == 322 && qwIssuedAt == 123 && dwPeriod == 300 && dwFlag == 3)
 		printf("[KEYGEN] check ok!\n");
 	else
 		printf("[KEYGEN] check failed!\n");

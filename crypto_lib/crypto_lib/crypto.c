@@ -300,8 +300,8 @@ uint16_t CRC16(const void *input_str, int num_bytes)
 bool SHA256_hash(void* buf, int len, void* hash)
 {
 	SHA256_CTX ctx;
-	sha256_init(&ctx);
-	sha256_update(&ctx, (uint8_t*)buf, len);
-	sha256_final(&ctx, hash);
+	sha256_init_2(&ctx);
+	sha256_update_2(&ctx, (uint8_t*)buf, len);
+	sha256_final_2(&ctx, hash);
 	return true;
 }

@@ -35,8 +35,8 @@ extern "C" {
 	bool SHA256_hash(void* buf, int len, void* hash);
 
 	/* keygen */
-	char* crypto_keygen(const void* dev_info, int len, RSA2048_KEY_BLOB* sigkey);
-	bool activation_checkout(const void* activate_code, const void* devinfo, int devinfo_len, RSA2048_KEY_BLOB* rsa_key);
+	char* crypto_keygen(const void* dev_info, int len, uint32_t dwSeq, uint64_t qwIssuedAt, uint32_t dwPeriod, uint32_t dwFlag, RSA2048_KEY_BLOB* sigkey);
+	bool activation_checkout(const void* activate_code, const void* devinfo, int devinfo_len, uint32_t* pdwSeq, uint64_t* pqwIssuedAt, uint32_t* pdwPeriod, uint32_t* pdwFlag, RSA2048_KEY_BLOB* rsa_key);
 
 #ifdef __cplusplus
 }

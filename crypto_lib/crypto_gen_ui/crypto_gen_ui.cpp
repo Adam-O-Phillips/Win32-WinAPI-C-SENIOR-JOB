@@ -4,12 +4,27 @@
 #include "framework.h"
 #include "crypto_gen_ui.h"
 #include "stdint.h"
+#include "stdio.h"
+#include "time.h"
+
 #include "..\\crypto_lib\crypto.h"
 
 #if defined _DEBUG
+
+#if defined WIN32
 #pragma comment(lib, "..\\Debug\\crypto_lib")
 #else
+#pragma comment(lib, "..\\x64\\Debug\\crypto_lib")
+#endif
+
+#else
+
+#if defined WIN32
 #pragma comment(lib, "..\\Release\\crypto_lib")
+#else
+#pragma comment(lib, "..\\x64\\Release\\crypto_lib")
+#endif
+
 #endif
 
 #define MAX_LOADSTRING 100
@@ -276,8 +291,38 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						privkey.blob_len = sizeof(sk_blob);
 						devinfo_len = GetWindowTextA(ghReqEdit, dev_info, sizeof(dev_info) - 1);
 
-						activate_code = crypto_keygen(dev_info, devinfo_len, &privkey);
+						uint32_t dwSeq = 0;
+						uint64_t qwIssuedAt = 0;
+						uint32_t dwPeriod = 0;
+						uint32_t dwFlag = 3;
+
+						FILE* fl = fopen("seq.bin", "rb");
+						if (fl)
+						{
+							fread(&dwSeq, sizeof(dwSeq), 1, fl);
+							fclose(fl);
+						}
+
+						dwSeq++;
+
+						time_t tm = 0;
+						time(&tm);
+
+						qwIssuedAt = tm;
+						dwPeriod = 30 * 24 * 3600;
+						dwFlag = 3;
+
+// 						dwSeq = 2;
+// 						qwIssuedAt = 100;
+						activate_code = crypto_keygen(dev_info, devinfo_len, dwSeq, qwIssuedAt, dwPeriod, dwFlag, &privkey);
 						SetWindowTextA(ghActiEdit, activate_code);
+
+						fl = fopen("seq.bin", "wb");
+						if (fl)
+						{
+							fwrite(&dwSeq, sizeof(dwSeq), 1, fl);
+							fclose(fl);
+						}
 
 						SAFE_FREE(activate_code);
 					}
@@ -297,7 +342,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						devinfo_len = GetWindowTextA(ghReqEdit, dev_info, sizeof(dev_info) - 1);
 						active_code[GetWindowTextA(ghActiEdit, active_code, sizeof(active_code) - 1)] = '\0';
 
-						if (activation_checkout(active_code, dev_info, devinfo_len, &pubkey))
+						uint32_t dwSeq = 0;
+						uint64_t qwIssuedAt = 0;
+						uint32_t dwPeriod = 0;
+						uint32_t dwFlag = 0;
+
+						if (activation_checkout(active_code, dev_info, devinfo_len, &dwSeq, &qwIssuedAt, &dwPeriod, &dwFlag, &pubkey))
 							MessageBox(hWnd, _T("Activation code validation success!"), _T("Info"), MB_OK);
 						else
 							MessageBox(hWnd, _T("Activation code validation failed!"), _T("Error"), MB_OK);
@@ -309,7 +359,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				switch (wmId)
 				{
 				case IDC_REQUEST_EDIT:
-					::PostMessage(hWnd, WM_COMMAND, MAKEWPARAM(IDC_GENERATE_BUTTON, BN_CLICKED), (LPARAM)ghGenBtn);
+					//::PostMessage(hWnd, WM_COMMAND, MAKEWPARAM(IDC_GENERATE_BUTTON, BN_CLICKED), (LPARAM)ghGenBtn);
 					break;
 				}
 				break;

@@ -10,7 +10,7 @@
 /*
 * Generate activation code from device information
 */
-char* crypto_keygen(const void* dev_info, int len, RSA2048_KEY_BLOB* sigkey)
+char* crypto_keygen(const void* dev_info, int len, uint32_t dwSeq, uint64_t qwIssuedAt, uint32_t dwPeriod, uint32_t dwFlag, RSA2048_KEY_BLOB* sigkey)
 {
 	void* base_data = NULL;
 	uint8_t hash[KEYGEN_HASH_LEN];
@@ -28,7 +28,7 @@ char* crypto_keygen(const void* dev_info, int len, RSA2048_KEY_BLOB* sigkey)
 		return NULL;
 
 	// create base container buffer for activation processing
-	valid_len = len + KEYGEN_CRC_LEN + KEYGEN_SIGNATURE_LEN;
+	valid_len = len + KEYGEN_CRC_LEN + sizeof(dwSeq) + sizeof(qwIssuedAt) + sizeof(dwPeriod) + sizeof(dwFlag) + KEYGEN_SIGNATURE_LEN;
 	dlen = ((valid_len + 7) / 8) * 8;
 	padding_len = dlen - valid_len;
 	base_data = malloc(dlen);
@@ -42,6 +42,22 @@ char* crypto_keygen(const void* dev_info, int len, RSA2048_KEY_BLOB* sigkey)
 	// calculate crc16 of device info and append it
 	*(uint16_t*)dptr = crc_16(base_data, (dptr - base_data));
 	dptr += KEYGEN_CRC_LEN;
+
+	// dwSequence
+	memcpy(dptr, &dwSeq, sizeof(dwSeq));
+	dptr += sizeof(dwSeq);
+
+	// qwIssuedAt
+	memcpy(dptr, &qwIssuedAt, sizeof(qwIssuedAt));
+	dptr += sizeof(qwIssuedAt);
+
+	// dwPeriod
+	memcpy(dptr, &dwPeriod, sizeof(dwPeriod));
+	dptr += sizeof(dwPeriod);
+
+	// dwFlag
+	memcpy(dptr, &dwFlag, sizeof(dwFlag));
+	dptr += sizeof(dwFlag);
 
 	// calculate hash and generate signature and then append the signature
 	if (!SHA256_hash(base_data, (dptr - base_data), hash))
@@ -80,13 +96,12 @@ _err_exit_:
 /*
 * Check validation of activate code
 */
-bool activation_checkout(const void* activate_code, const void* devinfo, int devinfo_len, RSA2048_KEY_BLOB* rsa_key)
+bool activation_checkout(const void* activate_code, const void* devinfo, int devinfo_len, uint32_t *pdwSeq, uint64_t *pqwIssuedAt, uint32_t *pdwPeriod, uint32_t *pdwFlag, RSA2048_KEY_BLOB* rsa_key)
 {
 	void* decbuf = NULL;
 	int declen = -1;
 	uint8_t* info = NULL;
 	uint8_t hash[KEYGEN_HASH_LEN];
-	uint8_t myhash[KEYGEN_HASH_LEN];
 	uint16_t crc = 0;
 	int info_len = -1;
 	uint8_t* iptr = NULL;
@@ -121,27 +136,30 @@ bool activation_checkout(const void* activate_code, const void* devinfo, int dev
 		goto _err_exit_;
 	SAFE_FREE(decbuf);
 
+	// dwFlag
+	iptr -= sizeof(*pdwFlag);
+	if (pdwFlag)
+		memcpy(pdwFlag, iptr, sizeof(*pdwFlag));
+
+	// dwPeriod
+	iptr -= sizeof(*pdwPeriod);
+	if (pdwPeriod)
+		memcpy(pdwPeriod, iptr, sizeof(*pdwPeriod));
+
+	// qwIssuedAt
+	iptr -= sizeof(*pqwIssuedAt);
+	if (pqwIssuedAt)
+		memcpy(pqwIssuedAt, iptr, sizeof(*pqwIssuedAt));
+
+	// dwSeq
+	iptr -= sizeof(*pdwSeq);
+	if (pdwSeq)
+		memcpy(pdwSeq, iptr, sizeof(*pdwSeq));
+
 	// check crc
 	iptr -= KEYGEN_CRC_LEN;
 	crc = CRC16(info, (iptr - info));
 	if (crc != *(uint16_t*)iptr)
-		goto _err_exit_;
-
-	// compare my hash with activation information's hash (final checkout)
-	{
-		int dlen = 0;
-		int padding_len = 0;
-
-		dlen = devinfo_len + KEYGEN_CRC_LEN + KEYGEN_SIGNATURE_LEN;
-		padding_len = (((dlen + 7) / 8) * 8) - dlen;
-		dlen = devinfo_len + padding_len + KEYGEN_CRC_LEN;
-		decbuf = malloc(dlen);
-		memset(decbuf, 0, dlen);
-		memcpy(decbuf, devinfo, devinfo_len);
-		*(uint16_t*)((uint8_t*)decbuf + dlen - 2) = CRC16(decbuf, dlen - 2);
-		SHA256_hash(decbuf, dlen, myhash);
-	}
-	if (memcmp(myhash, hash, KEYGEN_HASH_LEN) != 0)
 		goto _err_exit_;
 	
 	SAFE_FREE(decbuf);
