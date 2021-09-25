@@ -109,7 +109,7 @@ DWORD WINAPI InnerMateCommThreadProc(LPVOID lp)
 		char aucMateKeepAlive[3] = {'M', '#', pComm->GetMSState()};
 
 		ULONGLONG qwTickNow = GetTickCount64();
-
+		
 		if (nRecvLen == 0)
 		{
 			if (qwTickNow >= qwTickKeepAliveRx + MATE_COMM_MAX_DELAY * 2)

@@ -118,12 +118,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    ShowWindow(hWnd, nCmdShow);
    UpdateWindow(hWnd);
 
-   WSADATA wsa = {0, };
-   WSAStartup(MAKEWORD(2, 0), &wsa);
-
    gMateComm = new CMateComm(hWnd, 81, 0xC0A86700);
    gMateComm->CreateMateCommThread();
-
    return TRUE;
 }
 
