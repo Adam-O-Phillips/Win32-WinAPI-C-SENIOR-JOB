@@ -6,8 +6,14 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LicenseLib", "LicenseLib\LicenseLib.csproj", "{620FFBC1-AFEA-4494-997D-BC4CBD83994B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Keygen", "Keygen\Keygen.csproj", "{6A193D0A-139A-423B-9B0D-6D28C183418B}"
+	ProjectSection(ProjectDependencies) = postProject
+		{620FFBC1-AFEA-4494-997D-BC4CBD83994B} = {620FFBC1-AFEA-4494-997D-BC4CBD83994B}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Validator", "Validator\Validator.csproj", "{3EEFE902-258E-45F3-88FE-CAE933082C1B}"
+	ProjectSection(ProjectDependencies) = postProject
+		{620FFBC1-AFEA-4494-997D-BC4CBD83994B} = {620FFBC1-AFEA-4494-997D-BC4CBD83994B}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
