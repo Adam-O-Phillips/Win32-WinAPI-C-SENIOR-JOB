@@ -22,9 +22,13 @@ namespace Validator
     public partial class MainWindow : Window
     {
         static string pubKey = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEmHdk/3FDWYzsbWIb+Bk7JS7WIEd2GRCklF7O/VE9fU0MBi4ZXapzcbJt2+HS5uA9kG/QFNeesyfyp4MKwtj9VA==";
+        DeviceInfo deviceInfo = null;
         public MainWindow()
         {
             InitializeComponent();
+            deviceInfo = new DeviceInfo();
+
+            txtDevId.Text = deviceInfo.deviceHash;
         }
 
         private void Button_Click(object sender, RoutedEventArgs e)
