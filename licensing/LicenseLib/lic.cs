@@ -38,13 +38,16 @@ namespace LicenseLib
 
         public string validate_license(string active_code, string pubkey)
         {
+            if (active_code == "")
+                return "empty_license";
+
             var license = License.Load(active_code);
             var validationFailures = license.Validate()
                     .Signature(pubkey)
                     .AssertValidLicense();
             var result_str = "";
             foreach (var fail in validationFailures)
-                result_str += fail.GetType().Name + "\n";
+                result_str += fail.GetType().Name + ":" + fail.Message + "\n";
             if (String.IsNullOrEmpty(result_str))
                 result_str = "OK!";
             return result_str;
