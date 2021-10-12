@@ -26,22 +26,32 @@ namespace LicenseLib
 
         public string generate_licese_code(string DevId, string privkey)
         {
+            DateTime dt = DateTime.Now;
+            TimeSpan ts = new TimeSpan(0, 0, 0, 0, 30);
+            dt.Add(ts);
             var license = License.New()
                     .WithProductFeatures(new Dictionary<string, string>
                     {
                         {"Device Id", DevId }
                     })
+                    .ExpiresAt(dt)
                     .CreateAndSignWithPrivateKey(privkey, MyPasswd);
 
             return license.ToString();
         }
 
-        public string validate_license(string active_code, string pubkey)
+        public string validate_license(string req_code, string active_code, string pubkey)
         {
             if (active_code == "")
                 return "empty_license";
 
             var license = License.Load(active_code);
+            IDictionary<string, string> all_info = license.ProductFeatures.GetAll();
+            string strDevId = all_info["Device Id"];
+
+            if (req_code != strDevId)
+                return "invalid_request";
+
             var validationFailures = license.Validate()
                     .Signature(pubkey)
                     .AssertValidLicense();

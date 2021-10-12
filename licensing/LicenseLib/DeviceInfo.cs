@@ -8,9 +8,9 @@ using System.Security.Cryptography;
 using System.Net.NetworkInformation;
 using System.Management;
 
-namespace Validator
+namespace LicenseLib
 {
-    class DeviceInfo
+    public class DeviceInfo
     {
         private string hardDiskModelStr = null;
         private string hardDiskTypeStr = null;
@@ -154,16 +154,33 @@ namespace Validator
                 collectComputerName() + "], [" + collectMACAddr() + "]";
 
             byte[] bytes = Encoding.Unicode.GetBytes(text);
-            SHA256Managed hashstring = new SHA256Managed();
-            byte[] hash = hashstring.ComputeHash(bytes);
-            string hashString = string.Empty;
-            foreach (byte x in hash)
+
+            using (System.Security.Cryptography.MD5 md5 = System.Security.Cryptography.MD5.Create())
             {
-                hashString += String.Format("{0:x2}", x);
+                byte[] hashBytes = md5.ComputeHash(bytes);
+
+                // Convert the byte array to hexadecimal string
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < hashBytes.Length; i++)
+                {
+                    sb.Append(hashBytes[i].ToString("X2"));
+                }
+                deviceHash = sb.ToString();
+                return deviceHash;
             }
 
-            deviceHash = hashString;
-            return deviceHash;
+            using (SHA256Managed hashstring = new SHA256Managed())
+            {
+                byte[] hash = hashstring.ComputeHash(bytes);
+                string hashString = string.Empty;
+                foreach (byte x in hash)
+                {
+                    hashString += String.Format("{0:x2}", x);
+                }
+
+                deviceHash = hashString;
+                return deviceHash;
+            }
         }
     }
 }
