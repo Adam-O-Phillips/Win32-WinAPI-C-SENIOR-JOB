@@ -147,11 +147,17 @@ namespace LicenseLib
             macAddr = macAddrInfo;
             return macAddr;
         }
+
         public string collectHashString()
         {
-            string text = "[" + collectHardDiskInfo() + "], [" + collectWindowProdId() + "], [" +
-                collectCPUId() + "], [" +
-                collectComputerName() + "], [" + collectMACAddr() + "]";
+            deviceHash = getHashStringFromInfo(collectHardDiskInfo(), collectWindowProdId(), collectCPUId(), collectComputerName(), collectMACAddr());
+            return deviceHash;
+        }
+        public string getHashStringFromInfo(string strHdSn, string strWinProdId, string strCPUId, string strName, string strMacAddr)
+        {
+            string text = "[" + strHdSn + "], [" + strWinProdId + "], [" +
+                strCPUId + "], [" +
+                /*collectComputerName()*/"" + "], [" + /*collectMACAddr()*/"" + "]";
 
             byte[] bytes = Encoding.Unicode.GetBytes(text);
 
@@ -165,8 +171,7 @@ namespace LicenseLib
                 {
                     sb.Append(hashBytes[i].ToString("X2"));
                 }
-                deviceHash = sb.ToString();
-                return deviceHash;
+                return sb.ToString();
             }
 
             using (SHA256Managed hashstring = new SHA256Managed())
@@ -178,8 +183,7 @@ namespace LicenseLib
                     hashString += String.Format("{0:x2}", x);
                 }
 
-                deviceHash = hashString;
-                return deviceHash;
+                return hashString;
             }
         }
     }

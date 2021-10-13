@@ -397,21 +397,38 @@ namespace LicenseLib
         {
             byte[] dev_bt = crypto_custom.GetByteFromString(devkey);
 
-            byte[] blf_enc = crypto_custom.Base64Decode(activation_text);
-            byte[] ret_bt = crypto_custom.BlowfishDecrypt(blf_enc, dev_bt);
-            byte[] bt_body = new byte[ret_bt.Length - 256]; // without rsa2048-signature
-            Array.Copy(ret_bt, bt_body, bt_body.Length);
-            byte[] bt_rsa = new byte[256];
-            Array.Copy(ret_bt, bt_body.Length, bt_rsa, 0, 256);
+            byte[] blf_enc;
+            byte[] ret_bt;
+            byte[] bt_body;
+            byte[] bt_rsa;
+            try
+            {
+                blf_enc = crypto_custom.Base64Decode(activation_text);
+                ret_bt = crypto_custom.BlowfishDecrypt(blf_enc, dev_bt);
+                bt_body = new byte[ret_bt.Length - 256]; // without rsa2048-signature
+                Array.Copy(ret_bt, bt_body, bt_body.Length);
+                bt_rsa = new byte[256];
+                Array.Copy(ret_bt, bt_body.Length, bt_rsa, 0, 256);
+            }
+            catch (Exception ex)
+            {
+                return false;
+            }
+            finally
+            {
+            }
 
             if (!crypto_custom.VerifyRSA2048Signature(bt_body, bt_rsa, pubRSA2048Key))
                 return false;
 
-            int flag_pos = ret_bt.Length - 256 - 4;
-            int period_pos = flag_pos - 4;
-            int issued_pos = period_pos - 8;
-            int seq_pos = issued_pos - 4;
-            int crc16_pos = seq_pos - 2;
+            int crc16_pos = dev_bt.Length;
+            int seq_pos = crc16_pos + 2;
+            int issued_pos = seq_pos + 4;
+            int period_pos = issued_pos + 8;
+            int flag_pos = period_pos + 4;
+
+            if (crc16_pos <= 0)
+                return false;
 
             byte[] bt_crc = new byte[2];
             Array.Copy(bt_body, crc16_pos, bt_crc, 0, 2);
@@ -433,27 +450,27 @@ namespace LicenseLib
             byte[] bt_period = new byte[4];
             Array.Copy(bt_body, period_pos, bt_period, 0, 4);
             period = bt_period[0];
-            period = (flag << 8) | bt_period[1];
-            period = (flag << 8) | bt_period[2];
-            period = (flag << 8) | bt_period[3];
+            period = (period << 8) | bt_period[1];
+            period = (period << 8) | bt_period[2];
+            period = (period << 8) | bt_period[3];
 
             byte[] bt_issued_at = new byte[8];
             Array.Copy(bt_body, issued_pos, bt_issued_at, 0, 8);
             issuedAt = bt_issued_at[0];
-            issuedAt = (flag << 8) | bt_issued_at[1];
-            issuedAt = (flag << 8) | bt_issued_at[2];
-            issuedAt = (flag << 8) | bt_issued_at[3];
-            issuedAt = (flag << 8) | bt_issued_at[4];
-            issuedAt = (flag << 8) | bt_issued_at[5];
-            issuedAt = (flag << 8) | bt_issued_at[6];
-            issuedAt = (flag << 8) | bt_issued_at[7];
+            issuedAt = (issuedAt << 8) | bt_issued_at[1];
+            issuedAt = (issuedAt << 8) | bt_issued_at[2];
+            issuedAt = (issuedAt << 8) | bt_issued_at[3];
+            issuedAt = (issuedAt << 8) | bt_issued_at[4];
+            issuedAt = (issuedAt << 8) | bt_issued_at[5];
+            issuedAt = (issuedAt << 8) | bt_issued_at[6];
+            issuedAt = (issuedAt << 8) | bt_issued_at[7];
 
             byte[] bt_sequence = new byte[4];
             Array.Copy(bt_body, seq_pos, bt_sequence, 0, 4);
             sequence = bt_sequence[0];
-            sequence = (flag << 8) | bt_sequence[1];
-            sequence = (flag << 8) | bt_sequence[2];
-            sequence = (flag << 8) | bt_sequence[3];
+            sequence = (sequence << 8) | bt_sequence[1];
+            sequence = (sequence << 8) | bt_sequence[2];
+            sequence = (sequence << 8) | bt_sequence[3];
 
             return true;
         }
