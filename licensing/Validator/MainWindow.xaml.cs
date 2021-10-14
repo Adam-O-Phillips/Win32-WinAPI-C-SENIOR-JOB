@@ -41,7 +41,7 @@ namespace Validator
         private void Button_Click(object sender, RoutedEventArgs e)
         {
             if (crypto_custom.check_license(txtDevId.Text, txtActivCode.Text, pubRSA2048Key))
-                txtResult.Text = "OK";
+                txtResult.Text = "OK => " + "sequence:" + crypto_custom.sequence + ", issued at:" + crypto_custom.issuedAt + ", period:" + crypto_custom.period + ", flag:" + crypto_custom.flag;
             else
                 txtResult.Text = "Invalid";
             //             var lic = new KLicense();

@@ -337,6 +337,28 @@ namespace LicenseLib
             byte[] ret_bt = crypto_custom.merge_bytes(dev_bt, crypto_custom.CalcCRC16(dev_bt));
 
             UInt32 dwSeq = 0;
+
+            string strseq = null;
+            try
+            {
+                strseq = System.IO.File.ReadAllText("sequence.txt");
+            }
+            catch (Exception ex)
+            { }
+
+            if (!string.IsNullOrEmpty(strseq))
+            {
+                dwSeq = (UInt32)int.Parse(strseq);
+                dwSeq ++;
+            }
+
+            try
+            {
+                System.IO.File.WriteAllText("sequence.txt", dwSeq.ToString());
+            }
+            catch (Exception ex)
+            { }
+
             byte[] bt_seq = new byte[4];
             bt_seq[0] = (byte)(dwSeq >> 24);
             bt_seq[1] = (byte)(dwSeq >> 16);
