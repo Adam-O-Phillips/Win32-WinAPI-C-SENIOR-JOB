@@ -305,6 +305,71 @@ void CreateBMPFile(HWND hwnd, LPTSTR pszFile, PBITMAPINFO pbi,
 
 static HWND hStaticFound = NULL;
 static HWND hStaticTarget = NULL;
+static int mincx = 0, mincy = 0;
+
+void PrintLog(const char* fmt, ...)
+{
+	char szBuf[0x800] = {0, };
+	va_list va;
+	va_start(va, fmt);
+
+	vsprintf(szBuf, fmt, va);
+
+	va_end(va);
+
+	OutputDebugStringA(szBuf);
+}
+
+LRESULT CALLBACK HookProc(
+	int nCode,
+	WPARAM wParam,
+	LPARAM lParam
+)
+{
+	// process event
+	CWPSTRUCT* pStruct = (CWPSTRUCT*)lParam;
+	LRESULT nret = CallNextHookEx(NULL, nCode, wParam, lParam);
+
+	PrintLog("hwnd=0x%x, msg=0x%x, wparam=0x%x, lparam=0x%x, ret=%d\n", pStruct->hwnd, pStruct->message, pStruct->wParam, pStruct->lParam, nret);
+
+	return nret;
+}
+
+HHOOK ghHook = NULL;
+
+void HookWindowProc(HWND hWnd)
+{
+// 	if (hWnd)
+// 	{
+// 		DWORD prcId = 0;
+// 		DWORD dwThrId = GetWindowThreadProcessId(hWnd, &prcId);
+// 		ghHook = SetWindowsHookEx(WH_CALLWNDPROC, HookProc, (HINSTANCE)GetModuleHandle(NULL), dwThrId);
+// 	}
+	MINMAXINFO mmi = {0, };
+	::SendMessage(hWnd, WM_GETMINMAXINFO, 0, (LPARAM)&mmi);
+	PrintLog("position(%d, %d), size(%d, %d), maxtrack(%d, %d), mintrack(%d, %d)\n", mmi.ptMaxPosition.x, mmi.ptMaxPosition.y, mmi.ptMaxSize.x, mmi.ptMaxSize.y,
+		mmi.ptMaxTrackSize.x, mmi.ptMaxTrackSize.y, mmi.ptMinTrackSize.x, mmi.ptMinTrackSize.y);
+}
+
+void UnhookWindowProc(HWND hWnd)
+{
+// 	if (ghHook)
+// 		UnhookWindowsHookEx(ghHook);
+}
+
+bool IsFullScreen(HWND hWnd)
+{
+	RECT rc = {0, };
+	GetWindowRect(hWnd, &rc);
+
+	MONITORINFO monitor_info;
+	monitor_info.cbSize = sizeof(monitor_info);
+	GetMonitorInfo(MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST),
+		&monitor_info);
+	monitor_info.rcMonitor;
+
+	return memcmp(&rc, &monitor_info.rcMonitor, sizeof(RECT)) == 0;
+}
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -315,14 +380,114 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			int nRecvLen = (int)wParam;
 			const BYTE* pData = (const BYTE*)lParam;
 
-			int wx = MAKELONG(MAKEWORD(pData[3], pData[2]), MAKEWORD(pData[1], pData[0]));
-			int wy = MAKELONG(MAKEWORD(pData[7], pData[6]), MAKEWORD(pData[5], pData[4]));
-			int wcx = MAKELONG(MAKEWORD(pData[11], pData[10]), MAKEWORD(pData[9], pData[8]));
-			int wcy = MAKELONG(MAKEWORD(pData[15], pData[14]), MAKEWORD(pData[13], pData[12]));
+			if (nRecvLen == 16)
+			{
 
-			if (hStaticTarget)
-				MoveWindow(hStaticTarget, wx, wy, wcx, wcy, TRUE);
-				//SetWindowPos(hStaticTarget, NULL, wx, wy, wcx, wcy, SWP_SHOWWINDOW | SWP_NOZORDER);
+				int netx = MAKELONG(MAKEWORD(pData[3], pData[2]), MAKEWORD(pData[1], pData[0]));
+				int nety = MAKELONG(MAKEWORD(pData[7], pData[6]), MAKEWORD(pData[5], pData[4]));
+				int netcx = MAKELONG(MAKEWORD(pData[11], pData[10]), MAKEWORD(pData[9], pData[8]));
+				int netcy = MAKELONG(MAKEWORD(pData[15], pData[14]), MAKEWORD(pData[13], pData[12]));
+
+				netx *= 3;
+				nety *= 3;
+				netcx *= 3;
+				netcy *= 3;
+
+				//PrintLog("received (%d, %d, %d, %d)\n", netx, nety, netx + netcx, nety + netcy);
+
+				RECT rcMR = {netx, nety, netx + netcx, nety + netcy};
+
+				if (hStaticTarget)
+				{
+					static RECT oldViewRect = { 0, }, oldMRRect = { 0, };
+					RECT rcView = rcMR;
+
+					if (memcmp(&rcMR, &oldMRRect, sizeof(RECT)) == 0)
+						break;
+
+					int part = 0;
+					if (oldMRRect.left != rcMR.left && oldMRRect.right == rcMR.right) // left
+						part |= 1;
+					else if (oldMRRect.left == rcMR.left && oldMRRect.right != rcMR.right) // right
+						part |= 2;
+
+					if (oldMRRect.top != rcMR.top && oldMRRect.bottom == rcMR.bottom)// top
+						part |= 4;
+					else if (oldMRRect.top == rcMR.top && oldMRRect.bottom != rcMR.bottom) // bottom
+						part |= 8;
+
+					if (part & 1)
+					{
+						if (rcView.right - rcView.left < mincx)
+							rcView.left = rcView.right - mincx;
+					}
+					else if (part & 2)
+					{
+						if (rcView.right - rcView.left < mincx)
+							rcView.right = rcView.left + mincx;
+					}
+
+					if (part & 4)
+					{
+						if (rcView.bottom - rcView.top < mincy)
+							rcView.top = rcView.bottom - mincy;
+					}
+					else if (part & 8)
+					{
+						if (rcView.bottom - rcView.top < mincy)
+							rcView.bottom = rcView.top + mincy;
+					}
+
+					if (rcView.right - rcView.left < mincx)
+					{
+						part = part;
+					}
+					if (rcView.bottom - rcView.top < mincy)
+					{
+						part = part;
+					}
+
+					if (memcmp(&rcView, &oldViewRect, sizeof(RECT)) != 0)
+					{
+						//MoveWindow(hStaticTarget, rcView.left, rcView.top, rcView.right - rcView.left, rcView.bottom - rcView.top, TRUE);
+						SetWindowPos(hStaticTarget, NULL, rcView.left, rcView.top, rcView.right - rcView.left, rcView.bottom - rcView.top, SWP_SHOWWINDOW);
+
+						oldViewRect = rcView;
+
+						RECT rc = { 0, };
+						GetWindowRect(hStaticTarget, &rc);
+						if (rc.right - rc.left > rcView.right - rcView.left)
+						{
+							mincx = rc.right - rc.left;
+						}
+						if (rc.bottom - rc.top > rcView.bottom - rcView.top)
+						{
+							mincy = rc.bottom - rc.top;
+						}
+
+						//PrintLog("result (%d, %d, %d, %d)\n", rc.left, rc.top, rc.right, rc.bottom);
+					}
+
+					oldMRRect = rcMR;
+
+					//SetWindowPos(hStaticTarget, NULL, wx, wy, wcx, wcy, SWP_SHOWWINDOW | SWP_NOZORDER);
+				}
+			}
+			else if (nRecvLen == 1)
+			{
+// 				if (hStaticTarget && GetForegroundWindow() == hStaticTarget)
+// 				{
+// 					keybd_event(VK_RIGHT, 0, KEYEVENTF_EXTENDEDKEY | 0, 0);
+// 					keybd_event(VK_RIGHT, 0, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, 0);
+// 				}
+
+// 				if (hStaticTarget)
+// 				{
+// 					::PostMessage(hStaticTarget, WM_KEYDOWN, VK_RIGHT, MAKELPARAM(1, 0x4D | (1 << 8)));
+// 					::InvalidateRect(hStaticTarget, NULL, TRUE);
+// 					::PostMessage(hStaticTarget, WM_KEYUP, VK_RIGHT, MAKELPARAM(1, 0x4D | (1 << 8) | (1 << 14) | (1 << 15)));
+// 				}
+			}
 		}
 		break;
     case WM_COMMAND:
@@ -364,7 +529,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				GetWindowRect(hTarget, &rc);
 
 				TCHAR szMsg[0x200] = {0, };
-				_stprintf(szMsg, _T("\nwindow(0x%08X): [%s]-(%d, %d, %d, %d)"), hTarget, szWndText, rc.left, rc.top, rc.right, rc.bottom);
+				_stprintf(szMsg, _T("\nwindow(0x%08X): [%s]-(%d, %d, %d, %d)"), (unsigned int)hTarget, szWndText, rc.left, rc.top, rc.right, rc.bottom);
 				_tcscat(szTotalShow, szMsg);
 			}
 
@@ -377,6 +542,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
 	case WM_TIMER:
 		{
+			if (hStaticTarget)
+			{
+				if (!IsFullScreen(hStaticTarget))
+				{
+					if (GetForegroundWindow() != hStaticTarget)
+					{
+						SetForegroundWindow(hStaticTarget);
+						SetActiveWindow(hStaticTarget);
+					}
+
+					::PostMessage(hStaticTarget, WM_KEYDOWN, VK_F11, 0);
+					::PostMessage(hStaticTarget, WM_KEYUP, VK_F11, 0);
+				}
+			}
+
 			if (HIWORD(GetKeyState(VK_CONTROL)) == 0)
 				break;
 
@@ -395,7 +575,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				GetWindowRect(hFound, &rc);
 
 				if (_tcscmp(szCaption, _T("Form1")) != 0)
+				{
+					UnhookWindowProc(hStaticTarget);
 					hStaticTarget = hFound;
+					mincx = 0;
+					mincy = 0;
+
+					HookWindowProc(hStaticTarget);
+				}
 
 				::InvalidateRect(hWnd, NULL, TRUE);
 

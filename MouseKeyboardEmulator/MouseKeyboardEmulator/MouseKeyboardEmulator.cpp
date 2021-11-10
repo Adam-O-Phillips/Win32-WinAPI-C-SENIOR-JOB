@@ -134,6 +134,21 @@ bool IsDoubleCtrlPressed()
     return false;
 }
 
+bool IsDoubleShiftPressed()
+{
+	static bool bPressed = false;
+	if (!bPressed && (GetAsyncKeyState(VK_LSHIFT) & 0x8000) != 0 && (GetAsyncKeyState(VK_RSHIFT) & 0x8000) != 0)
+	{
+		bPressed = true;
+		return true;
+	}
+	else if (bPressed && (GetAsyncKeyState(VK_LSHIFT) & 0x8000) == 0 && (GetAsyncKeyState(VK_RSHIFT) & 0x8000) == 0)
+	{
+		bPressed = false;
+	}
+	return false;
+}
+
 HHOOK ghKeyHook = NULL, ghMouseHook = NULL;
 
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
@@ -193,7 +208,9 @@ void PlaybackCaptureData(time_t curTick)
             {
                 Log(_T("Finished playing recorded data."));
                 _fclose_nolock(flCapture);
-                gnState = 5;
+                //gnState = 5;
+                bFileLoad = true;
+                flCapture = NULL;
                 return;
             }
 
@@ -576,6 +593,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 }
                 break;
             case 4: // playback mode
+				if (IsDoubleShiftPressed())
+				{
+					gnState = 5;
+					tTickOld = tTickNow;
+					Log(_T("Exitting playback mode"));
+					break;
+				}
                 PlaybackCaptureData(tTickNow);
                 break;
             case 5:

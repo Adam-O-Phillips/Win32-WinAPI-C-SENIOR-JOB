@@ -146,9 +146,10 @@ void Log(const TCHAR* fmt, ...)
 
 void errhandler(const TCHAR* text, HANDLE hVal)
 {
-	Log(_T("error: %s-%d"), text, hVal);
+	Log(_T("error: %s-0x%08X, error=%d\n"), text, hVal, GetLastError());
 }
-PBITMAPINFO CreateBitmapInfoStruct(HWND hwnd, HBITMAP hBmp)
+
+PBITMAPINFO CreateBitmapInfoStruct(HBITMAP hBmp)
 {
 	BITMAP bmp;
 	PBITMAPINFO pbmi;
@@ -156,7 +157,37 @@ PBITMAPINFO CreateBitmapInfoStruct(HWND hwnd, HBITMAP hBmp)
 
 	// Retrieve the bitmap color format, width, and height.  
 	if (!GetObject(hBmp, sizeof(BITMAP), (LPSTR)& bmp))
-		errhandler(_T("GetObject"), hwnd);
+	{
+		int err = GetLastError();
+		struct {
+			BITMAPINFOHEADER bmiHeader;
+			RGBQUAD bmiColors[256];
+		} bmi;
+
+		HWND hDesktop = GetDesktopWindow();
+		memset(&bmi, 0, sizeof(bmi));
+		bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+
+		HDC hDC = GetDC(NULL);  // any DC will work
+
+		GetDIBits(hDC, hBmp, 0, 1, NULL, (BITMAPINFO*)& bmi,
+			DIB_RGB_COLORS);
+
+		ReleaseDC(NULL, hDC);
+
+		if (bmi.bmiHeader.biBitCount > 0)
+		{	
+			bmp.bmBitsPixel = bmi.bmiHeader.biBitCount;
+			bmp.bmHeight = bmi.bmiHeader.biHeight;
+			bmp.bmPlanes = bmi.bmiHeader.biPlanes;
+			bmp.bmWidth = bmi.bmiHeader.biWidth;
+		}
+		else
+		{
+			errhandler(_T("GetObject"), hBmp);
+			return NULL;
+		}
+	}
 
 	// Convert the color format to a count of bits.  
 	cClrBits = (WORD)(bmp.bmPlanes * bmp.bmBitsPixel);
@@ -212,7 +243,7 @@ PBITMAPINFO CreateBitmapInfoStruct(HWND hwnd, HBITMAP hBmp)
 	return pbmi;
 }
 
-void CreateBMPFile(HWND hwnd, LPTSTR pszFile, PBITMAPINFO pbi,
+void CreateBMPFile(LPTSTR pszFile, PBITMAPINFO pbi,
 	HBITMAP hBMP, HDC hDC)
 {
 	HANDLE hf;                 // file handle  
@@ -228,14 +259,14 @@ void CreateBMPFile(HWND hwnd, LPTSTR pszFile, PBITMAPINFO pbi,
 	lpBits = (LPBYTE)GlobalAlloc(GMEM_FIXED, pbih->biSizeImage);
 
 	if (!lpBits)
-		errhandler(_T("GlobalAlloc"), hwnd);
+		errhandler(_T("GlobalAlloc"), hBMP);
 
 	// Retrieve the color table (RGBQUAD array) and the bits  
 	// (array of palette indices) from the DIB.  
 	if (!GetDIBits(hDC, hBMP, 0, (WORD)pbih->biHeight, lpBits, pbi,
 		DIB_RGB_COLORS))
 	{
-		errhandler(_T("GetDIBits"), hwnd);
+		errhandler(_T("GetDIBits"), hBMP);
 	}
 
 	// Create the .BMP file.  
@@ -247,7 +278,7 @@ void CreateBMPFile(HWND hwnd, LPTSTR pszFile, PBITMAPINFO pbi,
 		FILE_ATTRIBUTE_NORMAL,
 		(HANDLE)NULL);
 	if (hf == INVALID_HANDLE_VALUE)
-		errhandler(_T("CreateFile"), hwnd);
+		errhandler(_T("CreateFile"), hBMP);
 	hdr.bfType = 0x4d42;        // 0x42 = "B" 0x4d = "M"  
 	// Compute the size of the entire file.  
 	hdr.bfSize = (DWORD)(sizeof(BITMAPFILEHEADER) +
@@ -265,27 +296,235 @@ void CreateBMPFile(HWND hwnd, LPTSTR pszFile, PBITMAPINFO pbi,
 	if (!WriteFile(hf, (LPVOID)& hdr, sizeof(BITMAPFILEHEADER),
 		(LPDWORD)& dwTmp, NULL))
 	{
-		errhandler(_T("WriteFile"), hwnd);
+		errhandler(_T("WriteFile"), hBMP);
 	}
 
 	// Copy the BITMAPINFOHEADER and RGBQUAD array into the file.  
 	if (!WriteFile(hf, (LPVOID)pbih, sizeof(BITMAPINFOHEADER)
 		+ pbih->biClrUsed * sizeof(RGBQUAD),
 		(LPDWORD)& dwTmp, (NULL)))
-		errhandler(_T("WriteFile"), hwnd);
+		errhandler(_T("WriteFile"), hBMP);
 
 	// Copy the array of color indices into the .BMP file.  
 	dwTotal = cb = pbih->biSizeImage;
 	hp = lpBits;
 	if (!WriteFile(hf, (LPSTR)hp, (int)cb, (LPDWORD)& dwTmp, NULL))
-		errhandler(_T("WriteFile"), hwnd);
+		errhandler(_T("WriteFile"), hBMP);
 
 	// Close the .BMP file.  
 	if (!CloseHandle(hf))
-		errhandler(_T("CloseHandle"), hwnd);
+		errhandler(_T("CloseHandle"), hBMP);
 
 	// Free memory.  
 	GlobalFree((HGLOBAL)lpBits);
+}
+
+static int seq = 0;
+
+void CreateBitmapFileFromWnd(HWND hWnd)
+{
+	TCHAR szCaption[0x100];
+	szCaption[GetWindowText(hWnd, szCaption, 0x100)] = '\0';
+
+	hWnd = GetDesktopWindow();
+
+	RECT rc = { 0, };
+	GetWindowRect(hWnd, &rc);
+
+	TCHAR szFilePath[0x200];
+	_stprintf(szFilePath, _T("thumb%04d.bmp"), seq++);
+
+	HDC hDC = ::GetWindowDC(hWnd);
+	HBITMAP hBMP = (HBITMAP)::GetCurrentObject(hDC, OBJ_BITMAP);
+
+	PBITMAPINFO pInfo = CreateBitmapInfoStruct(hBMP);
+	if (pInfo)
+	{
+		CreateBMPFile(szFilePath, pInfo, hBMP, hDC);
+		::LocalFree(pInfo);
+
+		Log(_T("0x%X-[%s]-(%d, %d, %d, %d)-thumb(%s)\n"), hWnd, szCaption, rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top, szFilePath);
+	}
+
+	::ReleaseDC(hWnd, hDC);
+}
+
+#include <atlimage.h>
+
+BOOL SaveHBITMAPToFile(HDC hBmpDC, HBITMAP hBitmap, LPCTSTR lpszFileName)
+{
+	HDC hDC;
+	int iBits;
+	WORD wBitCount;
+	DWORD dwPaletteSize = 0, dwBmBitsSize = 0, dwDIBSize = 0, dwWritten = 0;
+	BITMAP Bitmap0;
+	BITMAPFILEHEADER bmfHdr;
+	BITMAPINFOHEADER bi;
+	LPBITMAPINFOHEADER lpbi;
+	HANDLE fh, hDib, hPal, hOldPal2 = NULL;
+	hDC = CreateDC(TEXT("DISPLAY"), NULL, NULL, NULL);
+	iBits = GetDeviceCaps(hDC, BITSPIXEL) * GetDeviceCaps(hDC, PLANES);
+	DeleteDC(hDC);
+	if (iBits <= 1)
+		wBitCount = 1;
+	else if (iBits <= 4)
+		wBitCount = 4;
+	else if (iBits <= 8)
+		wBitCount = 8;
+	else
+		wBitCount = 24;
+	GetObject(hBitmap, sizeof(Bitmap0), (LPSTR)&Bitmap0);
+	bi.biSize = sizeof(BITMAPINFOHEADER);
+	bi.biWidth = Bitmap0.bmWidth;
+	bi.biHeight = -Bitmap0.bmHeight;
+	bi.biPlanes = 1;
+	bi.biBitCount = wBitCount;
+	bi.biCompression = BI_RGB;
+	bi.biSizeImage = 0;
+	bi.biXPelsPerMeter = 0;
+	bi.biYPelsPerMeter = 0;
+	bi.biClrImportant = 0;
+	bi.biClrUsed = 256;
+	dwBmBitsSize = ((Bitmap0.bmWidth * wBitCount + 31) & ~31) / 8
+		* Bitmap0.bmHeight;
+	hDib = GlobalAlloc(GHND, dwBmBitsSize + dwPaletteSize + sizeof(BITMAPINFOHEADER));
+	lpbi = (LPBITMAPINFOHEADER)GlobalLock(hDib);
+	*lpbi = bi;
+
+// 	hPal = GetStockObject(DEFAULT_PALETTE);
+// 	if (hPal)
+// 	{
+// 		hDC = GetDC(NULL);
+// 		hOldPal2 = SelectPalette(hDC, (HPALETTE)hPal, FALSE);
+// 		RealizePalette(hDC);
+// 	}
+// 
+
+	GetDIBits(hBmpDC, hBitmap, 0, (UINT)Bitmap0.bmHeight, (LPSTR)lpbi + sizeof(BITMAPINFOHEADER)
+		+ dwPaletteSize, (BITMAPINFO*)lpbi, DIB_RGB_COLORS);
+
+// 	if (hOldPal2)
+// 	{
+// 		SelectPalette(hDC, (HPALETTE)hOldPal2, TRUE);
+// 		RealizePalette(hDC);
+// 		ReleaseDC(NULL, hDC);
+// 	}
+
+	fh = CreateFile(lpszFileName, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+		FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+
+	if (fh == INVALID_HANDLE_VALUE)
+		return FALSE;
+
+	bmfHdr.bfType = 0x4D42; // "BM"
+	dwDIBSize = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + dwPaletteSize + dwBmBitsSize;
+	bmfHdr.bfSize = dwDIBSize;
+	bmfHdr.bfReserved1 = 0;
+	bmfHdr.bfReserved2 = 0;
+	bmfHdr.bfOffBits = (DWORD)sizeof(BITMAPFILEHEADER) + (DWORD)sizeof(BITMAPINFOHEADER) + dwPaletteSize;
+
+	WriteFile(fh, (LPSTR)&bmfHdr, sizeof(BITMAPFILEHEADER), &dwWritten, NULL);
+
+	WriteFile(fh, (LPSTR)lpbi, dwDIBSize, &dwWritten, NULL);
+	GlobalUnlock(hDib);
+	GlobalFree(hDib);
+	CloseHandle(fh);
+	return TRUE;
+}
+
+void GetScreenShot(void)
+{
+	int x1, y1, x2, y2, w, h;
+
+	// get screen dimensions
+	x1 = GetSystemMetrics(SM_XVIRTUALSCREEN);
+	y1 = GetSystemMetrics(SM_YVIRTUALSCREEN);
+	x2 = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+	y2 = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+	w = x2;
+	h = y2;
+
+	// copy screen to bitmap
+	HDC     hScreen = GetDC(NULL);
+	HDC     hDC = CreateCompatibleDC(hScreen);
+	HBITMAP hBitmap = CreateCompatibleBitmap(hScreen, w, h);
+	HGDIOBJ old_obj = SelectObject(hDC, hBitmap);
+	BOOL    bRet = BitBlt(hDC, 0, 0, w, h, hScreen, x1, y1, SRCCOPY);
+
+	// save bitmap to clipboard
+// 	OpenClipboard(NULL);
+// 	EmptyClipboard();
+// 	SetClipboardData(CF_BITMAP, hBitmap);
+// 	CloseClipboard();
+	CImage img;
+	img.Attach(hBitmap);
+	img.Save(_T("1.jpg"));
+
+	// clean up
+	SelectObject(hDC, old_obj);
+	DeleteDC(hDC);
+	ReleaseDC(NULL, hScreen);
+	DeleteObject(hBitmap);
+}
+
+void CreateBitmapFileFromDesktop(HWND hWnd)
+{
+	DWORD dwTick1 = GetTickCount();
+	GetScreenShot();
+	dwTick1 = GetTickCount() - dwTick1;
+	char szText[0x100] = {0, };
+	sprintf_s(szText, "%d =>\n", dwTick1);
+	OutputDebugStringA(szText);
+
+	return;
+	DWORD dwTick = GetTickCount();
+// 	RECT rcWnd = {0, };
+// 	GetWindowRect(hWnd, &rcWnd);
+// 
+// 	HWND hDesktopWnd = GetDesktopWindow();
+// 
+// 	RECT rcDesktop = {0, };
+// 	GetWindowRect(hDesktopWnd, &rcDesktop);
+// 
+// 	int cx = rcWnd.right - rcWnd.left, cy = rcWnd.bottom - rcWnd.top;
+
+	HDC hDC = ::GetDC(NULL);
+ 	HBITMAP hDesktopBmp = (HBITMAP)GetCurrentObject(hDC, OBJ_BITMAP);
+// 	CImage img;
+// 	img.Attach(hDesktopBmp);
+// 	img.Save(_T("1.jpg"));
+
+// 	HDC hMemDC = CreateCompatibleDC(hDC);
+// 	HBITMAP hMemBmp = (HBITMAP)::CreateCompatibleBitmap(hDC, cx, cy);
+// 	HBITMAP hOldMemBmp = (HBITMAP)::SelectObject(hMemDC, hMemBmp);
+// 
+// 	::BitBlt(hMemDC, 0, 0, cx, cy, hDC, rcWnd.left, rcWnd.top, SRCCOPY);
+
+	// save bitmap to clipboard
+	TCHAR szFilePath[0x200];
+	_stprintf(szFilePath, _T("thumb%04d.bmp"), seq++);
+
+	SaveHBITMAPToFile(hDC, hDesktopBmp, szFilePath);
+		
+// 	HBITMAP hMemBmp = hDesktopBmp;
+// 	HDC hMemDC = hDC;
+// 	PBITMAPINFO pInfo = CreateBitmapInfoStruct(hMemBmp);
+// 	if (pInfo)
+// 	{
+// 		CreateBMPFile(szFilePath, pInfo, hMemBmp, hMemDC);
+// 		::LocalFree(pInfo);
+// 
+// 		TCHAR szCaption[0x100] = {0, };
+// 		GetWindowText(hWnd, szCaption, 0xFF);
+// 		Log(_T("0x%X-[%s]-(%d, %d, %d, %d)-thumb(%s)\n"), hWnd, szCaption, rcWnd.left, rcWnd.top, rcWnd.right - rcWnd.left, rcWnd.bottom - rcWnd.top, szFilePath);
+//	}
+
+// 	::DeleteObject(::SelectObject(hMemDC, hOldMemBmp));
+// 	::DeleteObject(hMemDC);
+ 	::ReleaseDC(NULL, hDC);
+
+	dwTick = GetTickCount() - dwTick;
+	dwTick = dwTick;
 }
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -325,32 +564,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			POINT pt = {0, };
 			GetCursorPos(&pt);
 			HWND hFound = WindowFromPoint(pt);
+			HWND hWndParent = NULL;
+			while (hWndParent = ::GetParent(hFound))
+				hFound = hWndParent;
+
 			static HWND hStaticFound = NULL;
-			if (hFound != hStaticFound)
+			if (HIWORD(GetAsyncKeyState(VK_CONTROL)) > 0 && hFound != hStaticFound)
 			{
 				hStaticFound = hFound;
-
-				TCHAR szCaption[0x100];
-				szCaption[GetWindowText(hFound, szCaption, 0x100)] = '\0';
-
-				RECT rc = {0, };
-				GetWindowRect(hFound, &rc);
-
-				static int seq = 0;
-				TCHAR szFilePath[0x200];
-				_stprintf(szFilePath, _T("thumb%04d.bmp"), seq++);
-
-				HDC hDC = ::GetWindowDC(hFound);
-				HBITMAP hBMP = (HBITMAP)::GetCurrentObject(hDC, OBJ_BITMAP);
-
-				PBITMAPINFO pInfo = CreateBitmapInfoStruct(hFound, hBMP);
-				CreateBMPFile(hFound, szFilePath, pInfo, hBMP, hDC);
-				::LocalFree(pInfo);
-
-				::ReleaseDC(hFound, hDC);
-				Log(_T("0x%X-[%s]-(%d, %d, %d, %d)-thumb(%s)\n"), hFound, szCaption, rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top, szFilePath);
+				CreateBitmapFileFromDesktop(hFound);
+				//CreateBitmapFileFromWnd(hStaticFound);
 			}
 		}
+		break;
+	case WM_LBUTTONDOWN:
+		CreateBitmapFileFromDesktop(NULL);
 		break;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);

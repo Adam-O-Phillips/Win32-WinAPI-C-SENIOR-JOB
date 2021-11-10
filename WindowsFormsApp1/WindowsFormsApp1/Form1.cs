@@ -174,6 +174,7 @@ namespace WindowsFormsApp1
 
                     if (c != null)
                         c.SendBytes(bData);
+
                     Invalidate();
                 }
             }
@@ -222,6 +223,22 @@ namespace WindowsFormsApp1
 
             c = new UDPSocket();
             c.Client(textTxIP.Text, 27123);
+        }
+
+        Timer MyTimer = null;
+        private void Form1_Load(object sender, EventArgs e)
+        {
+//             MyTimer = new Timer();
+//             MyTimer.Interval = 40;
+//             MyTimer.Tick += new EventHandler(MyTimer_Tick);
+//             MyTimer.Start();
+        }
+        private void MyTimer_Tick(object sender, EventArgs e)
+        {
+            byte[] bData = new byte[1];
+            bData[0] = 0;
+            if (c != null)
+                c.SendBytes(bData);
         }
     }
 }

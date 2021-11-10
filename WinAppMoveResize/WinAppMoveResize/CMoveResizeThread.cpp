@@ -69,7 +69,7 @@ DWORD WINAPI InnerMRCommThreadProc(LPVOID lp)
 		if (nRecvLen > 0)
 		{
 			::SendMessage(hMsgWnd, WM_MR_RECEIVE_MSG, (WPARAM)nRecvLen, (LPARAM)aucData);
-			Log(_T("received message(%d) from mate\n"), nRecvLen);
+			//Log(_T("received message(%d) from mate\n"), nRecvLen);
 		}
 		else if (nRecvLen < 0)
 		{
